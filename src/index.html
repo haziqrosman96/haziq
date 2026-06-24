@@ -1,0 +1,709 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Dispatcher Summary V3</title>
+
+<script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<style>
+:root{
+  --rt-navy:#062b61;
+  --rt-blue:#0b63c7;
+  --rt-mid:#2a5298;
+  --rt-light:#f4f8ff;
+}
+*{box-sizing:border-box}
+body{
+  font-family:Segoe UI,Arial,sans-serif;
+  margin:0;
+  background:radial-gradient(circle at top,#ffffff 0,#f3f7fc 46%,#eef3fa 100%);
+  color:#182033;
+  user-select:none;
+}
+#lockScreen{
+  position:fixed;top:0;left:0;width:100%;height:100%;
+  background:linear-gradient(135deg,#062b61,#0b63c7);
+  display:flex;justify-content:center;align-items:center;z-index:9999;
+}
+.lock-box{
+  background:white;padding:28px;border-radius:18px;text-align:center;
+  width:460px;max-width:92%;box-shadow:0 20px 55px rgba(0,0,0,.28);
+}
+.lock-logo{width:230px;max-width:80%;margin:0 auto 10px;display:block}
+.app-hero{
+  background:linear-gradient(120deg,#05285b,#0b5fbd);
+  color:white;padding:28px 46px;display:flex;align-items:center;gap:36px;
+  box-shadow:0 3px 12px rgba(6,43,97,.25);
+}
+.hero-logo{width:390px;max-width:40%;filter:drop-shadow(0 8px 18px rgba(0,0,0,.24))}
+.hero-divider{width:1px;height:95px;background:rgba(255,255,255,.35)}
+.hero-copy h1{margin:0 0 10px;font-size:30px;font-weight:800;letter-spacing:.2px}
+.hero-copy p{margin:0;font-size:17px;opacity:.95}
+.container{padding:20px;display:none;}
+.controls,.chart-box{
+  background:rgba(255,255,255,.94);padding:18px 22px;border-radius:14px;
+  box-shadow:0 5px 18px rgba(25,42,70,.10);border:1px solid rgba(16,75,150,.08);
+}
+.controls{margin-bottom:18px;display:flex;align-items:center;gap:14px;flex-wrap:wrap;}
+#fileInfo{width:100%;font-size:15px;color:#1d2638;margin-top:2px;}
+.chart-box{width:560px;max-width:96%;min-height:290px;margin:45px auto 28px;}
+.chart-box h3{margin-top:8px;color:#0d1930;}
+button,input,textarea,select{padding:9px 13px;margin-right:6px;font-size:14px;}
+select{
+  border:2px solid #0b63c7;
+  border-radius:8px;
+  background:white;
+  font-weight:800;
+  color:#062b61;
+  min-width:150px;
+  cursor:pointer;
+}
+button{
+  background:linear-gradient(135deg,#0b428f,#0b63c7);color:white;border:none;border-radius:6px;
+  cursor:pointer;box-shadow:0 2px 5px rgba(0,0,0,.12);font-weight:600;
+}
+button:hover{filter:brightness(1.05)}
+.clear-btn{background:linear-gradient(135deg,#c82135,#e3344d);}
+table{width:100%;border-collapse:collapse;background:white;box-shadow:0 3px 12px rgba(20,40,70,.08);}
+th,td{border:1px solid #d9e1ef;padding:9px;text-align:center;}
+th{background:linear-gradient(135deg,#0a3c86,#0b63c7);color:white;font-size:15px;}
+.main-row{background:#e8f1ff;font-weight:bold;}
+.footer{text-align:center;padding:10px 15px 22px;font-size:15px;}
+.footer-logo{display:block;width:300px;max-width:70%;margin:16px auto 0;}
+.license-machine{font-size:12px;color:#556;}
+@media(max-width:760px){.app-hero{padding:22px;gap:18px}.hero-logo{width:240px}.hero-divider{display:none}.hero-copy h1{font-size:24px}.controls{display:block}.controls>*{margin-bottom:8px}}
+</style>
+</head>
+
+<body>
+
+<div id="lockScreen">
+<div class="lock-box">
+<img class="lock-logo" src="assets/rt_solution_logo.png" alt="RT Solution Logo">
+<h2>Customer License</h2>
+<p>Enter Customer License</p>
+<p style="font-size:13px;margin-bottom:6px;">This PC Machine ID:</p>
+<div id="machineIdBox" style="font-family:Consolas,monospace;background:#f1f1f1;border:1px solid #ddd;padding:8px;margin:6px auto 12px;max-width:360px;word-break:break-all;">Loading...</div>
+<button onclick="copyMachineId()" style="background:#198754;margin-bottom:10px;">Copy Machine ID</button>
+<textarea id="licensePass" rows="4" style="width:360px;max-width:90%;" placeholder="Paste customer license key here"></textarea>
+<br><br>
+<button onclick="unlockSystem()">Activate / Open System</button>
+<button onclick="clearSavedLicense()" style="background:#6c757d">Clear Saved License</button>
+<p id="licenseInfo" style="color:#333;font-size:13px"></p>
+<p id="error" style="color:red"></p>
+</div>
+</div>
+
+<div class="app-hero">
+  <img class="hero-logo" src="assets/rt_solution_logo.png" alt="RT Solution Logo">
+  <div class="hero-divider"></div>
+  <div class="hero-copy">
+    <h1>Dispatcher Summary Report</h1>
+    <p>View and analyze dispatcher performance summary</p>
+  </div>
+</div>
+
+<div class="container">
+
+<div class="controls">
+<label for="DispatcherMode" style="font-weight:800;color:#062b61;">Dispatcher:</label>
+
+<select id="DispatcherMode" style="min-width:150px;">
+  <option value="delivery">Delivery</option>
+  <option value="pickup">Pickup</option>
+</select>
+
+<input type="file" id="excelFile" accept=".xlsx,.xls">
+
+<button onclick="copyTable()">Copy Table</button>
+<button class="clear-btn" onclick="clearTable()">Clear Table</button>
+
+<div id="fileInfo">No file loaded</div>
+</div>
+
+<table id="summaryTable">
+<thead>
+<tr>
+<th>Dispatcher ID</th>
+<th>Name</th>
+<th>Total Parcel</th>
+<th colspan="5">Commission Calculator</th>
+</tr>
+</thead>
+<tbody></tbody>
+</table>
+
+<div class="chart-box">
+<h3 id="chartTitle" style="text-align:center;">Top 5 Highest Commission Dispatcher</h3>
+<canvas id="paretoChart"></canvas>
+</div>
+
+<div class="footer">
+Produced by <b>RT Solution</b><br>
+<img class="footer-logo" src="assets/rt_solution_logo.png" alt="RT Solution Logo">
+</div>
+
+</div>
+
+<script>
+
+const PUBLIC_KEY_PEM = `-----BEGIN PUBLIC KEY-----
+MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAENq21X6Ag77TFSkTblc1BLNZnliqn
+/EtzxUwIOFtcpHg1jzf0sFA2iOVuF9Msc5OxibC63wKJ06wDvLLLkrGQgA==
+-----END PUBLIC KEY-----`;
+
+let paretoChart=null;
+let CURRENT_MACHINE_ID="";
+
+function base64urlToBytes(value){
+  value = value.replace(/-/g, "+").replace(/_/g, "/");
+  while(value.length % 4) value += "=";
+  const binary = atob(value);
+  return Uint8Array.from(binary, c => c.charCodeAt(0));
+}
+
+function pemToArrayBuffer(pem){
+  const b64 = pem.replace(/-----BEGIN PUBLIC KEY-----/g, "")
+                 .replace(/-----END PUBLIC KEY-----/g, "")
+                 .replace(/\s/g, "");
+  return base64urlToBytes(b64).buffer;
+}
+
+async function verifyLicense(licenseKey){
+  if(!licenseKey || !licenseKey.startsWith("RTS-")) throw new Error("Invalid license format");
+  const body = licenseKey.substring(4).trim();
+  const parts = body.split(".");
+  if(parts.length !== 2) throw new Error("Invalid license format");
+
+  const payloadB64 = parts[0];
+  const signatureBytes = base64urlToBytes(parts[1]);
+
+  const publicKey = await crypto.subtle.importKey(
+    "spki",
+    pemToArrayBuffer(PUBLIC_KEY_PEM),
+    {name:"ECDSA", namedCurve:"P-256"},
+    false,
+    ["verify"]
+  );
+
+  const validSignature = await crypto.subtle.verify(
+    {name:"ECDSA", hash:"SHA-256"},
+    publicKey,
+    signatureBytes,
+    new TextEncoder().encode(payloadB64)
+  );
+
+  if(!validSignature) throw new Error("License signature is not valid");
+
+  const payloadText = new TextDecoder().decode(base64urlToBytes(payloadB64));
+  const payload = JSON.parse(payloadText);
+
+  if(payload.product !== "Dispatcher Summary V3") throw new Error("License is for another product");
+
+  if(!payload.machineId) throw new Error("License is not machine-locked. Generate a new license with Machine ID.");
+  if(!CURRENT_MACHINE_ID) throw new Error("Machine ID not loaded. Restart the app.");
+  if(payload.machineId !== CURRENT_MACHINE_ID) throw new Error("License is for another PC. Ask RT Solution for a license for this Machine ID.");
+
+  const today = new Date();
+  today.setHours(0,0,0,0);
+  const expiry = new Date(payload.expires + "T23:59:59");
+  if(today > expiry) throw new Error("License expired on " + payload.expires);
+
+  return payload;
+}
+
+function openSystem(payload){
+  document.getElementById("lockScreen").style.display="none";
+  document.querySelector(".container").style.display="block";
+  const footer = document.querySelector(".footer");
+  footer.innerHTML = `Produced by <b>RT Solution</b><br>Licensed to <b>${payload.customer}</b> until <b>${payload.expires}</b><br><span class="license-machine">Machine ID: ${payload.machineId}</span><img class="footer-logo" src="assets/rt_solution_logo.png" alt="RT Solution Logo">`;
+}
+
+async function unlockSystem(){
+  const input = document.getElementById("licensePass");
+  const error = document.getElementById("error");
+  const info = document.getElementById("licenseInfo");
+  error.innerHTML = "";
+  info.innerHTML = "Checking license...";
+
+  try{
+    const licenseKey = input.value.trim();
+    const payload = await verifyLicense(licenseKey);
+    localStorage.setItem("dispatcher_summary_license", licenseKey);
+    info.innerHTML = `License OK. Customer: ${payload.customer}. Expires: ${payload.expires}`;
+    openSystem(payload);
+  }catch(err){
+    info.innerHTML = "";
+    error.innerHTML = err.message || "Wrong License";
+  }
+}
+
+async function copyMachineId(){
+  if(!CURRENT_MACHINE_ID) return;
+  try{
+    await navigator.clipboard.writeText(CURRENT_MACHINE_ID);
+    document.getElementById("licenseInfo").innerHTML = "Machine ID copied.";
+  }catch(e){
+    document.getElementById("licenseInfo").innerHTML = "Machine ID: " + CURRENT_MACHINE_ID;
+  }
+}
+
+function clearSavedLicense(){
+  localStorage.removeItem("dispatcher_summary_license");
+  document.getElementById("licensePass").value = "";
+  document.getElementById("licenseInfo").innerHTML = "Saved license cleared.";
+}
+
+window.addEventListener("DOMContentLoaded", async function(){
+  try{
+    CURRENT_MACHINE_ID = await window.licenseApi.getMachineId();
+    document.getElementById("machineIdBox").innerText = CURRENT_MACHINE_ID;
+  }catch(e){
+    document.getElementById("machineIdBox").innerText = "Cannot read Machine ID";
+  }
+
+  const saved = localStorage.getItem("dispatcher_summary_license");
+  if(saved){
+    document.getElementById("licensePass").value = saved;
+    try{
+      const payload = await verifyLicense(saved);
+      openSystem(payload);
+    }catch(err){
+      localStorage.removeItem("dispatcher_summary_license");
+      document.getElementById("error").innerHTML = err.message || "Saved license invalid";
+    }
+  }
+});
+
+document.getElementById("DispatcherMode").addEventListener("change", function(){
+  clearTable(false);
+});
+
+document.getElementById("excelFile").addEventListener("change",function(e){
+
+const file=e.target.files[0];
+if(!file) return;
+
+const mode = document.getElementById("DispatcherMode").value;
+const modeText = mode.toUpperCase();
+
+document.getElementById("fileInfo").innerHTML =
+"Mode : <b>" + modeText + "</b> | Loaded File : <b>" + file.name + "</b>";
+
+const reader=new FileReader();
+
+reader.onload=function(event){
+
+const workbook=XLSX.read(event.target.result,{type:"array"});
+const worksheet=workbook.Sheets[workbook.SheetNames[0]];
+
+const rows=XLSX.utils.sheet_to_json(
+worksheet,
+{defval:""}
+);
+
+if(mode === "delivery"){
+  createDeliverySummary(rows);
+}else if(mode === "pickup"){
+  createPickupSummary(rows);
+}
+
+};
+
+reader.readAsArrayBuffer(file);
+
+});
+
+function setDeliveryHeader(){
+  document.querySelector("#summaryTable thead").innerHTML = `
+<tr>
+<th>Dispatcher ID</th>
+<th>Name</th>
+<th>Total Parcel</th>
+<th colspan="5">Commission Calculator</th>
+</tr>`;
+}
+
+function setPickupHeader(){
+  document.querySelector("#summaryTable thead").innerHTML = `
+<tr>
+<th>AWB No</th>
+<th>Pickup Dispatcher ID</th>
+<th>Pickup Dispatcher Name</th>
+<th>Billing Weight</th>
+<th>DP Signing</th>
+<th>Commission</th>
+</tr>`;
+}
+
+
+function createDeliverySummary(rows){
+
+setDeliveryHeader();
+
+document.getElementById("chartTitle").innerText = "Top 5 Highest Commission Dispatcher";
+
+const summary={};
+
+rows.forEach(row=>{
+
+const id=row["Dispatcher ID"];
+const name=row["Dispatcher Name"];
+const weight=parseFloat(row["Billing Weight"]);
+
+if(!id || !name || isNaN(weight)) return;
+
+if(!summary[id]){
+summary[id]={name:name,r1:0,r2:0,r3:0,total:0};
+}
+
+if(weight<=5) summary[id].r1++;
+else if(weight<=10) summary[id].r2++;
+else summary[id].r3++;
+
+summary[id].total++;
+
+});
+
+const tbody=document.querySelector("#summaryTable tbody");
+tbody.innerHTML="";
+
+let chartData=[];
+
+Object.entries(summary).forEach(([id,data])=>{
+
+let c1=data.r1*0.9;
+let c2=data.r2*1.3;
+let c3=data.r3*1.7;
+
+let total=c1+c2+c3;
+
+chartData.push({
+name:data.name,
+commission:total
+});
+
+tbody.innerHTML+=`
+<tr class="main-row">
+<td>${id}</td>
+<td>${data.name}</td>
+<td>${data.total}</td>
+<td colspan="5">Delivery Summary</td>
+</tr>
+
+<tr>
+<td></td><td></td><td></td>
+<td>Below 5kg</td>
+<td>0.9</td>
+<td>${data.r1}</td>
+<td></td>
+<td>RM ${c1.toFixed(2)}</td>
+</tr>
+
+<tr>
+<td></td><td></td><td></td>
+<td>5.01 - 10kg</td>
+<td>1.3</td>
+<td>${data.r2}</td>
+<td></td>
+<td>RM ${c2.toFixed(2)}</td>
+</tr>
+
+<tr>
+<td></td><td></td><td></td>
+<td>Above 10.01kg</td>
+<td>1.7</td>
+<td>${data.r3}</td>
+<td></td>
+<td>RM ${c3.toFixed(2)}</td>
+</tr>
+
+<tr style="font-weight:bold">
+<td></td><td></td><td></td>
+<td colspan="4" style="text-align:right">
+Total Commission (RM)
+</td>
+<td>RM ${total.toFixed(2)}</td>
+</tr>
+`;
+
+});
+
+drawPareto(chartData);
+
+}
+
+function normalizeText(value){
+  if(value === undefined || value === null) return "";
+  return String(value).trim().toUpperCase().replace(/\s+/g," ");
+}
+
+function getValue(row, names){
+  for(const name of names){
+    if(row[name] !== undefined && row[name] !== null && String(row[name]).trim() !== "") return row[name];
+  }
+
+  const keys = Object.keys(row);
+
+  for(const name of names){
+    const wanted = normalizeText(name);
+    const found = keys.find(k => normalizeText(k) === wanted);
+    if(found && String(row[found]).trim() !== "") return row[found];
+  }
+
+  return "";
+}
+
+function escapeHtml(value){
+  return String(value)
+    .replace(/&/g,"&amp;")
+    .replace(/</g,"&lt;")
+    .replace(/>/g,"&gt;")
+    .replace(/"/g,"&quot;")
+    .replace(/'/g,"&#039;");
+}
+
+function createPickupSummary(rows){
+
+setPickupHeader();
+document.getElementById("chartTitle").innerText = "Pickup AWB Detail Report";
+
+const tbody=document.querySelector("#summaryTable tbody");
+tbody.innerHTML="";
+
+if(paretoChart){
+  paretoChart.destroy();
+  paretoChart = null;
+}
+
+const PICKUP_RATE = 0.038;
+let totalAwb = 0;
+let totalCommission = 0;
+let dispatcherSummary = {};
+let htmlRows = [];
+
+rows.forEach(row=>{
+
+  const awb = getValue(row,[
+    "AWB No.",
+    "AWB No",
+    "AWB",
+    "Tracking No",
+    "Tracking Number",
+    "Waybill No",
+    "Waybill Number"
+  ]);
+
+  const dispatcherId = getValue(row,[
+    "Pick Up Dispatcher ID",
+    "Pickup Dispatcher ID",
+    "PickUp Dispatcher ID",
+    "Pick Up DispatcherID",
+    "Pickup DispatcherID"
+  ]);
+
+  const dispatcherName = getValue(row,[
+    "Pick Up Dispatcher Name",
+    "Pickup Dispatcher Name",
+    "PickUp Dispatcher Name",
+    "Pick Up DispatcherName",
+    "Pickup DispatcherName"
+  ]);
+
+  const billingWeight = getValue(row,[
+    "Billing Weight",
+    "BillingWeight",
+    "Weight",
+    "Chargeable Weight",
+    "Charge Weight",
+    "计费重量"
+  ]);
+
+  const dpSigning = getValue(row,[
+    "DP | Signing",
+    "DP|Signing",
+    "DP |Signing",
+    "DP| Signing",
+    "DP Signing",
+    "DPSigning",
+    "DP Sign",
+    "DP Signed",
+    "Date | DP Signing",
+    "DP Signing Date",
+    "签收网点",
+    "DP签收"
+  ]);
+
+  if(!awb || !dispatcherId) return;
+
+  totalAwb++;
+  totalCommission += PICKUP_RATE;
+
+  if(!dispatcherSummary[dispatcherId]){
+    dispatcherSummary[dispatcherId] = {name: dispatcherName || "-", commission: 0};
+  }
+
+  dispatcherSummary[dispatcherId].commission += PICKUP_RATE;
+
+  htmlRows.push(`
+<tr>
+<td>${escapeHtml(awb)}</td>
+<td>${escapeHtml(dispatcherId)}</td>
+<td>${escapeHtml(dispatcherName || "-")}</td>
+<td>${escapeHtml(billingWeight || "-")}</td>
+<td>${escapeHtml(dpSigning || "-")}</td>
+<td>RM ${PICKUP_RATE.toFixed(3)}</td>
+</tr>`);
+
+});
+
+if(totalAwb === 0){
+  tbody.innerHTML = `
+<tr>
+<td colspan="6" style="text-align:left;padding:15px;">
+No pickup data found.<br><br>
+Please make sure your Excel has these columns:<br>
+<b>AWB No.</b>, <b>Pick Up Dispatcher ID</b>, <b>Pick Up Dispatcher Name</b>, <b>Billing Weight</b>, and <b>DP Signing</b>.
+</td>
+</tr>`;
+  return;
+}
+
+htmlRows.push(`
+<tr class="main-row">
+<td>Total AWB</td>
+<td>${totalAwb}</td>
+<td colspan="3" style="text-align:right;font-weight:bold;">Total Pickup Commission</td>
+<td>RM ${totalCommission.toFixed(2)}</td>
+</tr>`);
+
+tbody.innerHTML = htmlRows.join("");
+
+const chartData = Object.entries(dispatcherSummary).map(([id,data])=>({
+  name: data.name && data.name !== "-" ? data.name : id,
+  commission: data.commission
+}));
+
+drawPareto(chartData.filter(x=>x.commission>0));
+
+}
+
+
+function drawPareto(data){
+
+data.sort((a,b)=>b.commission-a.commission);
+
+const top5=data.slice(0,5);
+
+const labels=top5.map(
+x=>x.name+" (RM "+x.commission.toFixed(2)+")"
+);
+
+const values=top5.map(x=>x.commission);
+
+if(paretoChart){
+paretoChart.destroy();
+}
+
+paretoChart=new Chart(
+document.getElementById("paretoChart"),
+{
+type:"pie",
+data:{
+labels:labels,
+datasets:[{data:values}]
+},
+options:{
+plugins:{
+legend:{position:"bottom"}
+}
+}
+}
+);
+
+}
+
+function copyTable(){
+
+const table=document.getElementById("summaryTable");
+
+let text="";
+
+for(let row of table.rows){
+
+let data=[];
+
+for(let cell of row.cells){
+
+let value = cell.innerText.trim();
+
+/*
+  Keep AWB number as text when pasted into Excel.
+  Without this, Excel may convert long AWB numbers into scientific notation.
+*/
+if(cell.cellIndex === 0 && /^\d{10,}$/.test(value)){
+  value = '="' + value + '"';
+}
+
+data.push(value);
+
+}
+
+text+=data.join("\t")+"\n";
+
+}
+
+navigator.clipboard.writeText(text)
+.then(()=>alert("Full table copied (Excel ready)"));
+
+}
+
+function clearTable(showAlert=true){
+
+document.querySelector("#summaryTable tbody").innerHTML="";
+document.getElementById("excelFile").value="";
+document.getElementById("fileInfo").innerHTML="No file loaded";
+
+const mode = document.getElementById("DispatcherMode").value;
+if(mode === "pickup"){
+  setPickupHeader();
+  document.getElementById("chartTitle").innerText="Pickup AWB Detail Report";
+}else{
+  setDeliveryHeader();
+  document.getElementById("chartTitle").innerText="Top 5 Highest Commission Dispatcher";
+}
+
+if(paretoChart){
+  paretoChart.destroy();
+  paretoChart = null;
+}
+
+if(showAlert){
+  alert("Table cleared");
+}
+
+}
+
+document.addEventListener("contextmenu",e=>e.preventDefault());
+
+document.addEventListener("keydown",function(e){
+
+if(e.key==="F12"){
+e.preventDefault();
+}
+
+if(
+e.ctrlKey &&
+["u","s","a","p","x"].includes(e.key.toLowerCase())
+){
+e.preventDefault();
+}
+
+});
+
+</script>
+
+</body>
+</html>
